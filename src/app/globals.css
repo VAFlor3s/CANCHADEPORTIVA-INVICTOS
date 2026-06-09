@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: #0f0800;
+  color: #e8eaf0;
+  min-height: 100vh;
+}
+
+@layer components {
+  .btn { @apply font-medium px-4 py-2 rounded-xl transition-all text-sm flex items-center gap-2 cursor-pointer; }
+  .btn-primary  { @apply btn bg-orange-500 hover:bg-orange-400 text-white; }
+  .btn-secondary { @apply btn bg-white/10 hover:bg-white/20 text-white border border-white/10; }
+  .btn-danger   { @apply btn bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/20; }
+  .btn-ghost    { @apply btn text-white/40 hover:text-white hover:bg-white/5; }
+
+  .card { @apply bg-white/5 border border-white/10 rounded-2xl p-5; }
+
+  .input {
+    @apply w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5
+           text-white placeholder-white/30 text-sm
+           focus:outline-none focus:border-orange-500/60 focus:bg-white/8 transition-all;
+    -webkit-appearance: none;
+  }
+  select.input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  select.input option { background: #1a0f02; color: #e8eaf0; }
+
+  .label { @apply block text-white/40 text-xs uppercase tracking-wider mb-1.5 font-medium; }
+
+  .kpi  { @apply bg-white/5 border border-white/10 rounded-2xl p-4; }
+
+  .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+
+  .trow { @apply border-b border-white/5 hover:bg-white/5 transition-colors; }
+
+  .ttitle {
+    font-family: 'Oswald', sans-serif;
+    @apply text-2xl font-semibold tracking-wide uppercase text-white;
+  }
+}
