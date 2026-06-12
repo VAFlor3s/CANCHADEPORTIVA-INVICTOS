@@ -1,16 +1,15 @@
 'use client'
+import Sidebar from '@/components/ui/Sidebar'
+import LoginScreen from '@/components/ui/LoginScreen'
 import { useAuth } from '@/lib/auth'
-import LoginScreen from './LoginScreen'
-import Sidebar from './Sidebar'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, ready } = useAuth()
+  const { user, loading } = useAuth()
 
-  if (!ready) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center"
-        style={{ background: '#0f0800' }}>
-        <div className="text-white/20 text-sm animate-pulse">Cargando...</div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0f0800' }}>
+        <div className="text-white/20 text-sm">Cargando...</div>
       </div>
     )
   }
@@ -20,9 +19,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 min-h-screen p-6 overflow-x-hidden"
-        style={{ marginLeft: 224 }}>
-        {children}
+      {/* Desktop: margin-left para el sidebar fijo. Mobile: padding-bottom para el bottom nav */}
+      <main className="flex-1 min-w-0 pb-20 md:pb-0" style={{ marginLeft: 0 }}
+        id="app-main">
+        <div className="min-h-screen p-4 md:p-6">
+          {children}
+        </div>
       </main>
     </div>
   )

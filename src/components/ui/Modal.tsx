@@ -1,41 +1,72 @@
 'use client'
 import { useEffect } from 'react'
 
-interface Props {
-  open: boolean
+interface ModalProps {
+  isOpen: boolean
   onClose: () => void
   title: string
   children: React.ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
-const sizes = { sm:'max-w-sm', md:'max-w-md', lg:'max-w-2xl', xl:'max-w-4xl' }
+const SIZES: Record<string, string> = {
+  sm: 'md:max-w-md',
+  md: 'md:max-w-lg',
+  lg: 'md:max-w-2xl',
+  xl: 'md:max-w-4xl',
+}
 
-export default function Modal({ open, onClose, title, children, size = 'md' }: Props) {
+export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    if (open) document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEsc)
+      document.body.style.overflow = ''
+    }
+  }, [isOpen, onClose])
 
-  if (!open) return null
+  if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={`w-full ${sizes[size]} rounded-2xl flex flex-col max-h-[90vh]`}
-        style={{ background: '#1a0f12', border: '1px solid rgba(249,115,22,0.2)' }}>
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Sheet: bottom-sheet en mobile, centered modal en desktop */}
+      <div
+        className={`
+          relative w-full ${SIZES[size]}
+          rounded-t-3xl md:rounded-2xl
+          border border-white/10 shadow-2xl
+          animate-in
+          flex flex-col
+        `}
+        style={{ background: '#1a0f02', maxHeight: '92dvh' }}
+      >
+        {/* Handle en mobile */}
+        <div className="md:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0">
-          <h2 className="text-white font-semibold text-base">{title}</h2>
-          <button onClick={onClose}
-            className="text-white/30 hover:text-white transition-colors text-xl leading-none">✕</button>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0">
+          <h2 className="text-white font-semibold text-base md:text-lg" style={{ fontFamily: 'Oswald, sans-serif', letterSpacing: '0.05em' }}>
+            {title.toUpperCase()}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-white/30 hover:text-white/70 transition-colors text-xl w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 flex-shrink-0"
+          >
+            ×
+          </button>
         </div>
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 px-6 py-5">
-          {children}
-        </div>
+
+        {/* Content — scrolleable */}
+        <div className="p-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   )
