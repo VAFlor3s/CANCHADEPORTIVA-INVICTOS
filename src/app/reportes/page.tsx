@@ -2,216 +2,294 @@
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/ui/AppLayout'
 import { supabase } from '@/lib/supabase'
-import { fmt, getLast30Days } from '@/lib/utils'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-
-const COLORS = ['#f97316','#a78bfa','#60a5fa','#4ade80','#fb7185']
+import { formatCurrency, formatDate, getLast30Days } from '@/lib/utils'
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  AreaChart, Area, PieChart, Pie, Cell, Legend
+} from 'recharts'
 
 export default function ReportesPage() {
-  const [from, setFrom] = useState(getLast30Days().start)
-  const [to,   setTo]   = useState(getLast30Days().end)
-  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState('30d')
+  const [data, setData] = useState<any>({
+    totalRevenue: 0, totalTransactions: 0, avgTicket: 0,
+    revenueByType: [], dailyRevenue: [], topProducts: [],
+    reservationStats: { total: 0, confirmed: 0, cancelled: 0, revenue: 0 },
+    championshipStats: { total: 0, active: 0, teams: 0, revenue: 0 },
+    stockAlerts: [],
+  })
 
-  useEffect(() => { load() }, [from, to])
+  useEffect(() => { fetchReports() }, [period])
 
-  async function load() {
+  function getDateRange() {
+    const end = new Date()
+    const start = new Date()
+    if (period === '7d') start.setDate(start.getDate() - 6)
+    else if (period === '30d') start.setDate(start.getDate() - 29)
+    else if (period === '90d') start.setDate(start.getDate() - 89)
+    else start.setFullYear(start.getFullYear(), 0, 1)
+    return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] }
+  }
+
+  async function fetchReports() {
     setLoading(true)
-    const [salesRes, resRes, champsRes, teamsRes, prodRes] = await Promise.all([
-      supabase.from('sales').select('*').gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59'),
-      supabase.from('reservations').select('*').gte('date', from).lte('date', to),
+    const { start, end } = getDateRange()
+
+    const [salesRes, reservRes, champRes, teamsRes, stockRes, saleItemsRes] = await Promise.all([
+      supabase.from('sales').select('*').gte('created_at', start).lte('created_at', end + 'T23:59:59'),
+      supabase.from('reservations').select('*').gte('created_at', start).lte('created_at', end + 'T23:59:59'),
       supabase.from('championships').select('*'),
       supabase.from('teams').select('*'),
-      supabase.from('products').select('*').eq('is_active', true),
+      supabase.from('products').select('*').lte('stock', 10).eq('is_active', true),
+      supabase.from('sale_items').select('*, products(name)').gte('created_at', start).lte('created_at', end + 'T23:59:59'),
     ])
 
-    const sales      = salesRes.data  || []
-    const reservas   = resRes.data    || []
-    const champs     = champsRes.data || []
-    const teams      = teamsRes.data  || []
-    const prods      = prodRes.data   || []
+    const sales = salesRes.data || []
+    const reservations = reservRes.data || []
+    const championships = champRes.data || []
+    const teams = teamsRes.data || []
+    const stockAlerts = stockRes.data || []
+    const items = saleItemsRes.data || []
 
-    const totalIncome = sales.reduce((s, x) => s + Number(x.total_amount), 0)
+    const totalRevenue = sales.reduce((s, x) => s + Number(x.total_amount), 0)
+    const totalTransactions = sales.length
 
-    // Por tipo
-    const byType: Record<string,number> = {}
-    sales.forEach(s => {
-      byType[s.sale_type] = (byType[s.sale_type] || 0) + Number(s.total_amount)
+    // Revenue by type
+    const types = ['alquiler', 'campeonato', 'producto', 'bebida', 'otro']
+    const typeColors = ['#f97316', '#a855f7', '#f59e0b', '#0ea5e9', '#6b7280']
+    const revenueByType = types.map((t, i) => ({
+      name: t.charAt(0).toUpperCase() + t.slice(1),
+      value: sales.filter(s => s.sale_type === t).reduce((a, b) => a + Number(b.total_amount), 0),
+      color: typeColors[i],
+    })).filter(x => x.value > 0)
+
+    // Daily revenue (last N days)
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365
+    const dailyRevenue = Array.from({ length: Math.min(days, 60) }, (_, i) => {
+      const d = new Date(end); d.setDate(d.getDate() - (Math.min(days, 60) - 1 - i))
+      const key = d.toISOString().split('T')[0]
+      const label = d.toLocaleDateString('es-CO', days <= 30 ? { day: 'numeric', month: 'short' } : { month: 'short' })
+      return {
+        label,
+        Ingresos: sales.filter(s => s.created_at.startsWith(key)).reduce((a, b) => a + Number(b.total_amount), 0),
+      }
     })
 
-    const pieData = Object.entries(byType).map(([name, value]) => ({ name, value }))
-
-    // Por día
-    const days: Record<string,number> = {}
-    const cur = new Date(from)
-    const end = new Date(to)
-    while (cur <= end) {
-      days[cur.toISOString().split('T')[0]] = 0
-      cur.setDate(cur.getDate() + 1)
-    }
-    sales.forEach(s => {
-      const d = s.created_at.split('T')[0]
-      if (d in days) days[d] += Number(s.total_amount)
+    // Top products
+    const productMap: Record<string, { name: string; qty: number; revenue: number }> = {}
+    items.forEach(item => {
+      const name = (item as any).products?.name || item.product_name
+      if (!productMap[name]) productMap[name] = { name, qty: 0, revenue: 0 }
+      productMap[name].qty += item.quantity
+      productMap[name].revenue += Number(item.subtotal || item.quantity * item.unit_price)
     })
-    const lineData = Object.entries(days).map(([date, total]) => ({
-      dia: new Date(date + 'T00:00:00').toLocaleDateString('es-CO', { month:'short', day:'2-digit' }),
-      total,
-    }))
+    const topProducts = Object.values(productMap).sort((a, b) => b.revenue - a.revenue).slice(0, 8)
 
-    // Método de pago
-    const byMethod: Record<string,number> = {}
-    sales.forEach(s => { byMethod[s.payment_method] = (byMethod[s.payment_method] || 0) + Number(s.total_amount) })
-
-    // Reservas
-    const resStats = {
-      total: reservas.length,
-      confirmadas: reservas.filter(r => r.status === 'confirmada').length,
-      canceladas: reservas.filter(r => r.status === 'cancelada').length,
-      income: sales.filter(s => s.sale_type === 'alquiler').reduce((s, x) => s + Number(x.total_amount), 0),
-    }
-
-    // Stock bajo
-    const lowStock = prods.filter(p => p.stock <= p.min_stock)
-
-    setData({ totalIncome, byType, pieData, lineData, byMethod, resStats, lowStock, sales, champs, teams })
+    setData({
+      totalRevenue, totalTransactions,
+      avgTicket: totalTransactions > 0 ? totalRevenue / totalTransactions : 0,
+      revenueByType, dailyRevenue, topProducts,
+      reservationStats: {
+        total: reservations.length,
+        confirmed: reservations.filter(r => r.status === 'confirmada').length,
+        cancelled: reservations.filter(r => r.status === 'cancelada').length,
+        revenue: sales.filter(s => s.sale_type === 'alquiler').reduce((s, r) => s + Number(r.total_amount), 0),
+      },
+      championshipStats: {
+        total: championships.length,
+        active: championships.filter(c => c.status === 'en_curso').length,
+        teams: teams.length,
+        revenue: sales.filter(s => s.sale_type === 'campeonato').reduce((s, t) => s + Number(t.total_amount), 0),
+      },
+      stockAlerts,
+    })
     setLoading(false)
   }
 
-  const TYPE_LABEL: Record<string,string> = {
-    producto:'Productos', bebida:'Bebidas', alquiler:'Alquiler', campeonato:'Campeonatos', otro:'Otros',
+  function exportCSV() {
+    const rows = [
+      ['Reporte Cancha Sintética Invictos'],
+      ['Período', period],
+      [''],
+      ['RESUMEN'],
+      ['Ingresos totales', data.totalRevenue],
+      ['Transacciones', data.totalTransactions],
+      ['Ticket promedio', data.avgTicket.toFixed(0)],
+      [''],
+      ['INGRESOS POR TIPO'],
+      ...data.revenueByType.map((r: any) => [r.name, r.value]),
+      [''],
+      ['RESERVAS'],
+      ['Total', data.reservationStats.total],
+      ['Confirmadas', data.reservationStats.confirmed],
+      ['Canceladas', data.reservationStats.cancelled],
+      [''],
+      ['TOP PRODUCTOS'],
+      ['Producto', 'Cantidad', 'Ingresos'],
+      ...data.topProducts.map((p: any) => [p.name, p.qty, p.revenue]),
+    ]
+    const csv = rows.map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `reporte-sports-${period}.csv`; a.click()
   }
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="ttitle">Reportes</h1>
-          <p className="text-white/30 text-sm mt-1">Análisis financiero del período</p>
-        </div>
-
-        {/* Período */}
-        <div className="flex gap-3 flex-wrap items-center">
+      <div className="space-y-5 animate-in pt-2 md:pt-0">
+        <div className="flex items-center justify-between">
           <div>
-            <label className="label">Desde</label>
-            <input type="date" className="input w-44" value={from} onChange={e => setFrom(e.target.value)} />
+            <h1 className="section-title text-white">Reportes</h1>
+            <p className="text-white/40 text-sm mt-1">Análisis de rendimiento del negocio</p>
           </div>
-          <div>
-            <label className="label">Hasta</label>
-            <input type="date" className="input w-44" value={to} onChange={e => setTo(e.target.value)} />
+          <div className="flex gap-3">
+            <div className="flex rounded-xl overflow-hidden border border-white/10">
+              {[['7d','7 días'],['30d','30 días'],['90d','90 días'],['year','Este año']].map(([v, l]) => (
+                <button key={v} onClick={() => setPeriod(v)}
+                  className={`px-3 py-2 text-xs transition-all ${period === v ? 'bg-orange-500 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <button onClick={exportCSV} className="btn-secondary text-xs">📥 Exportar CSV</button>
           </div>
-          {[
-            { label: 'Hoy', fn: () => { const t=new Date().toISOString().split('T')[0]; setFrom(t); setTo(t) } },
-            { label: '7 días', fn: () => { const e=new Date(),s=new Date(); s.setDate(s.getDate()-6); setFrom(s.toISOString().split('T')[0]); setTo(e.toISOString().split('T')[0]) } },
-            { label: '30 días', fn: () => { const {start,end}=getLast30Days(); setFrom(start); setTo(end) } },
-          ].map(b => (
-            <button key={b.label} onClick={b.fn} className="btn btn-secondary text-xs mt-5">{b.label}</button>
-          ))}
         </div>
 
         {loading ? (
-          <div className="text-white/20 text-sm py-16 text-center">Cargando datos...</div>
-        ) : !data ? null : (
+          <div className="flex items-center justify-center py-20 text-white/20">Generando reporte...</div>
+        ) : (
           <>
-            {/* KPIs */}
+            {/* KPIs principales */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="kpi">
-                <div className="text-white/35 text-xs uppercase tracking-wider mb-2">Ingresos totales</div>
-                <div className="text-3xl font-bold text-orange-400" style={{ fontFamily:'Oswald,sans-serif' }}>{fmt(data.totalIncome)}</div>
-              </div>
-              <div className="kpi">
-                <div className="text-white/35 text-xs uppercase tracking-wider mb-2">Transacciones</div>
-                <div className="text-3xl font-bold text-white" style={{ fontFamily:'Oswald,sans-serif' }}>{data.sales.length}</div>
-              </div>
-              <div className="kpi">
-                <div className="text-white/35 text-xs uppercase tracking-wider mb-2">Reservas</div>
-                <div className="text-3xl font-bold text-purple-400" style={{ fontFamily:'Oswald,sans-serif' }}>{data.resStats.total}</div>
-                <div className="text-white/25 text-xs">{data.resStats.canceladas} canceladas</div>
-              </div>
-              <div className="kpi">
-                <div className="text-white/35 text-xs uppercase tracking-wider mb-2">Ingresos alquiler</div>
-                <div className="text-3xl font-bold text-blue-400" style={{ fontFamily:'Oswald,sans-serif' }}>{fmt(data.resStats.income)}</div>
-              </div>
-            </div>
-
-            {/* Por tipo */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {Object.entries(data.byType).map(([type, amount]: any) => (
-                <div key={type} className="kpi">
-                  <div className="text-white/35 text-xs">{TYPE_LABEL[type] || type}</div>
-                  <div className="text-white font-bold text-lg mt-1" style={{ fontFamily:'Oswald,sans-serif' }}>{fmt(amount)}</div>
-                  <div className="text-white/25 text-xs">{((amount / data.totalIncome) * 100).toFixed(1)}%</div>
+              {[
+                { label: 'Ingresos totales', value: formatCurrency(data.totalRevenue), icon: '💵', color: '#f97316' },
+                { label: 'Transacciones', value: data.totalTransactions, icon: '🧾', color: '#0ea5e9' },
+                { label: 'Ticket promedio', value: formatCurrency(data.avgTicket), icon: '📊', color: '#f59e0b' },
+                { label: 'Productos en alerta', value: data.stockAlerts.length, icon: '⚠️', color: '#ef4444' },
+              ].map(k => (
+                <div key={k.label} className="stat-card">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/40 text-xs">{k.label}</span>
+                    <span className="text-xl">{k.icon}</span>
+                  </div>
+                  <div className="text-2xl font-bold mt-1" style={{ color: k.color, fontFamily: 'Oswald, sans-serif' }}>{k.value}</div>
                 </div>
               ))}
             </div>
 
-            {/* Gráficas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Módulos */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="card">
-                <h2 className="text-white/50 text-xs uppercase tracking-wider mb-4">Ingresos por día</h2>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={data.lineData} barSize={data.lineData.length > 20 ? 4 : 12}>
-                    <XAxis dataKey="dia" tick={{ fill:'rgba(255,255,255,0.3)', fontSize:10 }} axisLine={false} tickLine={false}
-                      interval={data.lineData.length > 15 ? Math.floor(data.lineData.length/8) : 0} />
-                    <YAxis tick={{ fill:'rgba(255,255,255,0.2)', fontSize:9 }} axisLine={false} tickLine={false}
-                      tickFormatter={v => fmt(v).replace(/\$|\s/g,'').slice(0,6)} width={50} />
-                    <Tooltip formatter={(v:any) => [fmt(Number(v)),'Ingresos']}
-                      contentStyle={{ background:'#1a0f12', border:'1px solid rgba(249,115,22,0.3)', borderRadius:12, color:'#fff', fontSize:12 }} />
-                    <Bar dataKey="total" fill="#f97316" radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <h3 className="text-white/60 text-xs uppercase tracking-wider mb-1">🏟 Alquiler de Cancha</h3>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {[['Total reservas', data.reservationStats.total], ['Confirmadas', data.reservationStats.confirmed], ['Canceladas', data.reservationStats.cancelled], ['Ingresos', formatCurrency(data.reservationStats.revenue)]].map(([l, v]) => (
+                    <div key={l as string} className="stat-card">
+                      <div className="text-white/40 text-xs">{l}</div>
+                      <div className="text-lg font-bold text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="card">
+                <h3 className="text-white/60 text-xs uppercase tracking-wider mb-1">🏆 Campeonatos</h3>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {[['Total campeonatos', data.championshipStats.total], ['En curso', data.championshipStats.active], ['Equipos inscritos', data.championshipStats.teams], ['Ingresos inscrip.', formatCurrency(data.championshipStats.revenue)]].map(([l, v]) => (
+                    <div key={l as string} className="stat-card">
+                      <div className="text-white/40 text-xs">{l}</div>
+                      <div className="text-lg font-bold text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Gráficas */}
+            <div className="card">
+              <h3 className="text-white/70 text-sm font-medium mb-4">Ingresos diarios</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={data.dailyRevenue}>
+                  <defs>
+                    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ background: '#1a1000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }} formatter={(v: any) => [formatCurrency(Number(v)), 'Ingresos']} />
+                  <Area type="monotone" dataKey="Ingresos" stroke="#f97316" fill="url(#grad)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Pie por tipo */}
+              <div className="card">
+                <h3 className="text-white/70 text-sm font-medium mb-4">Distribución por tipo</h3>
+                {data.revenueByType.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie data={data.revenueByType} cx="50%" cy="50%" outerRadius={75} dataKey="value" strokeWidth={0}>
+                          {data.revenueByType.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ background: '#1a1000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }} formatter={(v: any) => [formatCurrency(Number(v)), ""]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-1.5">
+                      {data.revenueByType.map((d: any) => (
+                        <div key={d.name} className="flex items-center gap-2 text-xs">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                          <span className="text-white/50 flex-1">{d.name}</span>
+                          <span className="text-white/80">{formatCurrency(d.value)}</span>
+                          <span className="text-white/30">({data.totalRevenue > 0 ? Math.round(d.value / data.totalRevenue * 100) : 0}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <div className="flex items-center justify-center h-48 text-white/20 text-sm">Sin datos</div>}
               </div>
 
+              {/* Top productos */}
               <div className="card">
-                <h2 className="text-white/50 text-xs uppercase tracking-wider mb-4">Distribución por tipo</h2>
-                {data.pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie data={data.pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
-                        paddingAngle={3} dataKey="value"
-                        label={({ name, percent }) => `${TYPE_LABEL[name]||name} ${(percent*100).toFixed(0)}%`}
-                        labelLine={false}>
-                        {data.pieData.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v:any) => [fmt(Number(v))]}
-                        contentStyle={{ background:'#1a0f12', border:'1px solid rgba(249,115,22,0.3)', borderRadius:12, color:'#fff', fontSize:12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <h3 className="text-white/70 text-sm font-medium mb-4">Productos más vendidos</h3>
+                {data.topProducts.length === 0 ? (
+                  <div className="flex items-center justify-center h-48 text-white/20 text-sm">Sin ventas de productos</div>
                 ) : (
-                  <div className="h-48 flex items-center justify-center text-white/20 text-sm">Sin datos</div>
+                  <div className="space-y-2">
+                    {data.topProducts.map((p: any, i: number) => {
+                      const maxRevenue = data.topProducts[0]?.revenue || 1
+                      return (
+                        <div key={p.name} className="flex items-center gap-3">
+                          <span className="text-white/20 text-xs w-4">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white/80 text-xs truncate">{p.name}</div>
+                            <div className="mt-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                              <div className="h-full rounded-full bg-orange-500" style={{ width: `${(p.revenue / maxRevenue) * 100}%` }} />
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-white/70 text-xs">{formatCurrency(p.revenue)}</div>
+                            <div className="text-white/30 text-xs">{p.qty} uds</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Método de pago */}
-            <div className="card">
-              <h2 className="text-white/50 text-xs uppercase tracking-wider mb-4">Métodos de pago</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {Object.entries(data.byMethod).map(([method, amount]: any) => {
-                  const icons: Record<string,string> = { efectivo:'💵', tarjeta:'💳', transferencia:'📱', otro:'❓' }
-                  return (
-                    <div key={method} className="kpi">
-                      <div className="text-white/35 text-xs">{icons[method]} {method}</div>
-                      <div className="text-white font-bold text-lg mt-1" style={{ fontFamily:'Oswald,sans-serif' }}>{fmt(amount)}</div>
-                      <div className="text-white/25 text-xs">{((amount / data.totalIncome) * 100).toFixed(1)}%</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Stock bajo */}
-            {data.lowStock.length > 0 && (
-              <div className="card">
-                <h2 className="text-white/50 text-xs uppercase tracking-wider mb-4">⚠️ Productos con stock bajo</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {data.lowStock.map((p: any) => (
-                    <div key={p.id} className="p-3 rounded-xl border border-red-500/20" style={{ background:'rgba(239,68,68,0.07)' }}>
-                      <div className="text-white text-sm font-medium">{p.name}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-lg font-bold ${p.stock === 0 ? 'text-red-400' : 'text-yellow-400'}`}
-                          style={{ fontFamily:'Oswald,sans-serif' }}>{p.stock}</span>
-                        <span className="text-white/30 text-xs">/ mín {p.min_stock}</span>
-                      </div>
+            {/* Alertas de stock */}
+            {data.stockAlerts.length > 0 && (
+              <div className="card border-orange-500/20">
+                <h3 className="text-orange-400 text-sm font-medium mb-4">⚠ Productos con bajo stock</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {data.stockAlerts.map((p: any) => (
+                    <div key={p.id} className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
+                      <div className="text-white/80 text-sm font-medium">{p.name}</div>
+                      <div className="text-orange-400 text-lg font-bold mt-1" style={{ fontFamily: 'Oswald, sans-serif' }}>{p.stock} <span className="text-xs font-normal text-white/30">{p.unit}</span></div>
+                      <div className="text-white/30 text-xs">Mínimo: {p.min_stock}</div>
                     </div>
                   ))}
                 </div>
