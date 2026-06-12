@@ -3,195 +3,230 @@ import { useEffect, useState } from 'react'
 import AppLayout from '@/components/ui/AppLayout'
 import Modal from '@/components/ui/Modal'
 import { supabase, Championship, Team } from '@/lib/supabase'
-import { fmt, fmtDate, STATUS_COLOR, STATUS_LABEL } from '@/lib/utils'
-import { useAuth } from '@/lib/auth'
+import { formatCurrency, formatDate, STATUS_COLORS, getStatusLabel } from '@/lib/utils'
 
-const EMPTY_C = { name: '', sport_type: 'fútbol', category: '', start_date: '', end_date: '', registration_fee: 0, prize: '', max_teams: 0, status: 'inscripcion', notes: '' }
-const EMPTY_T = { name: '', captain_name: '', captain_phone: '', player_count: 0, registration_paid: false, amount_paid: 0, notes: '' }
+const INITIAL_CHAMP = {
+  name: '', sport_type: 'fútbol', category: '', start_date: '', end_date: '',
+  registration_fee: 0, prize_description: '', max_teams: 0, status: 'inscripcion', description: '',
+}
+
+const INITIAL_TEAM = {
+  championship_id: '', name: '', captain_name: '', captain_phone: '',
+  player_count: 0, registration_paid: false, amount_paid: 0, notes: '',
+}
 
 export default function CampeonatosPage() {
-  const { isAdmin } = useAuth()
-  const [champs, setChamps]     = useState<Championship[]>([])
-  const [teams, setTeams]       = useState<Team[]>([])
-  const [sel, setSel]           = useState<Championship|null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [openC, setOpenC]       = useState(false)
-  const [openT, setOpenT]       = useState(false)
-  const [formC, setFormC]       = useState({ ...EMPTY_C })
-  const [formT, setFormT]       = useState({ ...EMPTY_T })
-  const [saving, setSaving]     = useState(false)
-  const [delC, setDelC]         = useState<string|null>(null)
-  const [delT, setDelT]         = useState<string|null>(null)
+  const [championships, setChampionships] = useState<Championship[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [selected, setSelected] = useState<Championship | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showChampModal, setShowChampModal] = useState(false)
+  const [showTeamModal, setShowTeamModal] = useState(false)
+  const [champForm, setChampForm] = useState({ ...INITIAL_CHAMP })
+  const [teamForm, setTeamForm] = useState({ ...INITIAL_TEAM })
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => { loadChamps() }, [])
-  useEffect(() => { if (sel) loadTeams(sel.id) }, [sel])
+  useEffect(() => { fetchAll() }, [])
 
-  async function loadChamps() {
+  async function fetchAll() {
     setLoading(true)
     const { data } = await supabase.from('championships').select('*').order('created_at', { ascending: false })
-    setChamps(data || [])
+    setChampionships(data || [])
     setLoading(false)
+    if (selected) fetchTeams(selected.id)
   }
 
-  async function loadTeams(cid: string) {
-    const { data } = await supabase.from('teams').select('*').eq('championship_id', cid).order('name')
+  async function fetchTeams(champId: string) {
+    const { data } = await supabase.from('teams').select('*').eq('championship_id', champId).order('name')
     setTeams(data || [])
   }
 
+  function selectChamp(c: Championship) {
+    setSelected(c)
+    fetchTeams(c.id)
+  }
+
   async function saveChamp() {
-    if (!formC.name) { alert('El nombre es obligatorio'); return }
+    if (!champForm.name) { alert('El nombre es obligatorio'); return }
     setSaving(true)
-    await supabase.from('championships').insert([{ ...formC, start_date: formC.start_date || null, end_date: formC.end_date || null, max_teams: formC.max_teams || null }])
+    const { error } = await supabase.from('championships').insert([{
+      ...champForm,
+      registration_fee: Number(champForm.registration_fee),
+      max_teams: champForm.max_teams ? Number(champForm.max_teams) : null,
+      start_date: champForm.start_date || null,
+      end_date: champForm.end_date || null,
+    }])
     setSaving(false)
-    setOpenC(false)
-    setFormC({ ...EMPTY_C })
-    loadChamps()
+    if (error) { alert('Error: ' + error.message); return }
+    setShowChampModal(false)
+    setChampForm({ ...INITIAL_CHAMP })
+    fetchAll()
   }
 
   async function saveTeam() {
-    if (!sel || !formT.name) { alert('El nombre del equipo es obligatorio'); return }
+    if (!selected || !teamForm.name) { alert('El nombre del equipo es obligatorio'); return }
     setSaving(true)
-    await supabase.from('teams').insert([{ ...formT, championship_id: sel.id }])
-    // Si pagó, registrar en ventas
-    if (formT.amount_paid > 0) {
+    const { error } = await supabase.from('teams').insert([{
+      championship_id: selected.id,
+      name: teamForm.name,
+      captain_name: teamForm.captain_name || null,
+      captain_phone: teamForm.captain_phone || null,
+      player_count: Number(teamForm.player_count),
+      registration_paid: teamForm.registration_paid,
+      amount_paid: Number(teamForm.amount_paid),
+      notes: teamForm.notes || null,
+    }])
+
+    if (!error && teamForm.registration_paid && selected.registration_fee > 0) {
       await supabase.from('sales').insert([{
-        sale_type: 'campeonato', customer_name: formT.name,
-        total_amount: formT.amount_paid, payment_method: 'efectivo',
-        notes: `Inscripción ${sel.name}`,
+        sale_type: 'campeonato',
+        customer_name: teamForm.captain_name || teamForm.name,
+        total_amount: Number(teamForm.amount_paid) || selected.registration_fee,
+        payment_method: 'efectivo',
+        notes: `Inscripción ${selected.name} - Equipo ${teamForm.name}`,
       }])
     }
+
     setSaving(false)
-    setOpenT(false)
-    setFormT({ ...EMPTY_T })
-    loadTeams(sel.id)
+    if (error) { alert('Error: ' + error.message); return }
+    setShowTeamModal(false)
+    setTeamForm({ ...INITIAL_TEAM })
+    if (selected) fetchTeams(selected.id)
   }
 
-  async function delChamp(id: string) {
-    if (!confirm('¿Eliminar campeonato y todos sus equipos?')) return
-    setDelC(id)
-    await supabase.from('teams').delete().eq('championship_id', id)
-    await supabase.from('championships').delete().eq('id', id)
-    if (sel?.id === id) setSel(null)
-    setDelC(null)
-    loadChamps()
+  async function updateChampStatus(id: string, status: Championship['status']) {
+    await supabase.from('championships').update({ status }).eq('id', id)
+    fetchAll()
   }
 
-  async function delTeam(id: string) {
-    if (!confirm('¿Eliminar este equipo?')) return
-    setDelT(id)
-    await supabase.from('teams').delete().eq('id', id)
-    setDelT(null)
-    if (sel) loadTeams(sel.id)
-  }
-
-  const selTeams = teams.filter(t => t.championship_id === sel?.id)
-  const paidTeams = selTeams.filter(t => t.registration_paid)
+  const STATUS_LABELS: Championship['status'][] = ['inscripcion', 'en_curso', 'finalizado', 'cancelado']
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-5 animate-in pt-2 md:pt-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="ttitle">Campeonatos</h1>
-            <p className="text-white/30 text-sm mt-1">{champs.length} campeonatos</p>
+            <h1 className="section-title text-white">Campeonatos</h1>
+            <p className="text-white/40 text-sm mt-1">{championships.length} campeonatos registrados</p>
           </div>
-          {isAdmin && <button onClick={() => setOpenC(true)} className="btn btn-primary">+ Nuevo Campeonato</button>}
+          <button onClick={() => setShowChampModal(true)} className="btn-primary">
+            + Nuevo Campeonato
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Lista campeonatos */}
-          <div className="lg:col-span-2 space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Lista de campeonatos */}
+          <div className="lg:col-span-1 space-y-3">
+            <h3 className="text-white/50 text-xs uppercase tracking-wider">Todos los campeonatos</h3>
             {loading ? (
               <div className="text-white/20 text-sm py-8 text-center">Cargando...</div>
-            ) : champs.length === 0 ? (
-              <div className="text-white/20 text-sm py-8 text-center">Sin campeonatos</div>
-            ) : champs.map(c => (
-              <div key={c.id}
-                onClick={() => setSel(c)}
-                className="card cursor-pointer transition-all"
-                style={{
-                  borderColor: sel?.id === c.id ? 'rgba(249,115,22,0.5)' : 'rgba(255,255,255,0.1)',
-                  background: sel?.id === c.id ? 'rgba(249,115,22,0.08)' : 'rgba(255,255,255,0.04)',
-                }}>
-                <div className="flex items-start justify-between">
+            ) : championships.length === 0 ? (
+              <div className="card text-center text-white/20 text-sm py-8">Sin campeonatos</div>
+            ) : championships.map(c => (
+              <div
+                key={c.id}
+                onClick={() => selectChamp(c)}
+                className={`card cursor-pointer transition-all ${selected?.id === c.id ? 'border-orange-500/40 bg-orange-500/5' : 'hover:border-white/20'}`}
+              >
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-medium truncate">{c.name}</div>
-                    <div className="text-white/30 text-xs mt-0.5">{c.sport_type} {c.category ? `· ${c.category}` : ''}</div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`badge ${STATUS_COLOR[c.status]}`}>{STATUS_LABEL[c.status]}</span>
-                      <span className="text-white/30 text-xs">{fmt(c.registration_fee)}/equipo</span>
-                    </div>
+                    <div className="text-white font-medium text-sm truncate">{c.name}</div>
+                    <div className="text-white/40 text-xs mt-0.5">{c.sport_type} • {c.category}</div>
                   </div>
-                  {isAdmin && (
-                    <button onClick={e => { e.stopPropagation(); delChamp(c.id) }} disabled={delC === c.id}
-                      className="btn btn-danger px-2 py-1 text-xs ml-2 flex-shrink-0">🗑</button>
-                  )}
+                  <span className={`badge ${(STATUS_COLORS as any)[c.status] || 'bg-gray-100 text-gray-800'} flex-shrink-0`}>{getStatusLabel(c.status)}</span>
+                </div>
+                <div className="flex items-center gap-4 mt-3 text-xs text-white/40">
+                  {c.registration_fee > 0 && <span>Inscripción: {formatCurrency(c.registration_fee)}</span>}
+                  {c.max_teams && <span>Máx {c.max_teams} equipos</span>}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Detalle campeonato */}
-          <div className="lg:col-span-3">
-            {!sel ? (
-              <div className="card h-64 flex items-center justify-center text-white/20 text-sm">
-                Selecciona un campeonato para ver sus equipos
+          {/* Detalle de campeonato seleccionado */}
+          <div className="lg:col-span-2">
+            {!selected ? (
+              <div className="card h-48 flex items-center justify-center text-white/20 text-sm">
+                Selecciona un campeonato para ver los equipos
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="card">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h2 className="text-white font-semibold">{sel.name}</h2>
-                      <p className="text-white/30 text-xs mt-0.5">{sel.sport_type}</p>
+                      <h2 className="text-white font-semibold text-lg" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                        {selected.name.toUpperCase()}
+                      </h2>
+                      <p className="text-white/40 text-sm">{selected.sport_type} {selected.category && `• ${selected.category}`}</p>
                     </div>
-                    {isAdmin && <button onClick={() => setOpenT(true)} className="btn btn-primary text-sm">+ Equipo</button>}
+                    <div className="flex gap-2">
+                      <select
+                        value={selected.status}
+                        onChange={e => updateChampStatus(selected.id, e.target.value as Championship['status'])}
+                        className="input-field w-36 text-xs"
+                      >
+                        {STATUS_LABELS.map(s => <option key={s} value={s}>{getStatusLabel(s)}</option>)}
+                      </select>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="kpi">
-                      <div className="text-white/35 text-xs">Equipos</div>
-                      <div className="text-white font-bold text-xl" style={{ fontFamily: 'Oswald,sans-serif' }}>{selTeams.length}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                    <div className="stat-card">
+                      <div className="text-white/40 text-xs">Equipos inscritos</div>
+                      <div className="text-2xl font-bold text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>{teams.length}</div>
                     </div>
-                    <div className="kpi">
-                      <div className="text-white/35 text-xs">Pagaron</div>
-                      <div className="text-green-400 font-bold text-xl" style={{ fontFamily: 'Oswald,sans-serif' }}>{paidTeams.length}</div>
+                    <div className="stat-card">
+                      <div className="text-white/40 text-xs">Inscripciones cobradas</div>
+                      <div className="text-2xl font-bold text-orange-400" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                        {formatCurrency(teams.filter(t => t.registration_paid).reduce((sum, t) => sum + Number(t.amount_paid), 0))}
+                      </div>
                     </div>
-                    <div className="kpi">
-                      <div className="text-white/35 text-xs">Recaudado</div>
-                      <div className="text-orange-400 font-bold text-lg" style={{ fontFamily: 'Oswald,sans-serif' }}>
-                        {fmt(paidTeams.reduce((s, t) => s + Number(t.amount_paid), 0))}
+                    <div className="stat-card">
+                      <div className="text-white/40 text-xs">Pendientes de pago</div>
+                      <div className="text-2xl font-bold text-yellow-400" style={{ fontFamily: 'Oswald, sans-serif' }}>
+                        {teams.filter(t => !t.registration_paid).length}
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {selTeams.length === 0 ? (
-                    <div className="text-white/20 text-sm py-4 text-center">Sin equipos inscritos</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {selTeams.map(t => (
-                        <div key={t.id} className="flex items-center gap-3 py-2.5 px-3 rounded-xl"
-                          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-white text-sm font-medium">{t.name}</div>
-                            {t.captain_name && <div className="text-white/30 text-xs">Cap: {t.captain_name}</div>}
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-xs font-medium ${t.registration_paid ? 'text-green-400' : 'text-yellow-400'}`}>
-                              {t.registration_paid ? '✓ Pagado' : 'Pendiente'}
-                            </div>
-                            {t.amount_paid > 0 && <div className="text-white/40 text-xs">{fmt(Number(t.amount_paid))}</div>}
-                          </div>
-                          {isAdmin && (
-                            <button onClick={() => delTeam(t.id)} disabled={delT === t.id}
-                              className="btn btn-danger px-2 py-1 text-xs">
-                              {delT === t.id ? '...' : '🗑'}
-                            </button>
-                          )}
-                        </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-white/70 text-sm font-medium">Equipos ({teams.length})</h3>
+                  <button onClick={() => setShowTeamModal(true)} className="btn-secondary text-xs">
+                    + Agregar Equipo
+                  </button>
+                </div>
+
+                <div className="card overflow-hidden p-0">
+                  <div className="overflow-x-auto -mx-4 md:mx-0"><table className="w-full text-sm min-w-[600px]">
+                    <thead style={{ background: 'rgba(255,255,255,0.03)' }}>
+                      <tr className="text-white/30 text-xs uppercase tracking-wider">
+                        <th className="text-left px-4 py-3">Equipo</th>
+                        <th className="text-left px-4 py-3">Capitán</th>
+                        <th className="text-center px-4 py-3">Jugadores</th>
+                        <th className="text-center px-4 py-3">Inscripción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teams.length === 0 ? (
+                        <tr><td colSpan={4} className="text-center text-white/20 py-8">Sin equipos inscritos</td></tr>
+                      ) : teams.map(t => (
+                        <tr key={t.id} className="table-row">
+                          <td className="px-4 py-3 text-white font-medium">{t.name}</td>
+                          <td className="px-4 py-3 text-white/60">
+                            <div>{t.captain_name || '—'}</div>
+                            {t.captain_phone && <div className="text-white/30 text-xs">{t.captain_phone}</div>}
+                          </td>
+                          <td className="px-4 py-3 text-center text-white/60">{t.player_count}</td>
+                          <td className="px-4 py-3 text-center">
+                            {t.registration_paid
+                              ? <span className="badge bg-orange-100 text-orange-800">✓ Pagado</span>
+                              : <span className="badge bg-red-100 text-red-800">Pendiente</span>
+                            }
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -199,94 +234,93 @@ export default function CampeonatosPage() {
         </div>
       </div>
 
-      {/* Modal nuevo campeonato */}
-      <Modal open={openC} onClose={() => { setOpenC(false); setFormC({...EMPTY_C}) }} title="Nuevo Campeonato">
-        <div className="space-y-4">
-          <div>
-            <label className="label">Nombre *</label>
-            <input className="input" value={formC.name} onChange={e => setFormC(p => ({ ...p, name: e.target.value }))} placeholder="Nombre del campeonato" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Deporte</label>
-              <input className="input" value={formC.sport_type} onChange={e => setFormC(p => ({ ...p, sport_type: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Categoría</label>
-              <input className="input" value={formC.category} onChange={e => setFormC(p => ({ ...p, category: e.target.value }))} placeholder="Sub-20, Libre, Femenino..." />
-            </div>
-            <div>
-              <label className="label">Fecha inicio</label>
-              <input type="date" className="input" value={formC.start_date} onChange={e => setFormC(p => ({ ...p, start_date: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Fecha fin</label>
-              <input type="date" className="input" value={formC.end_date} onChange={e => setFormC(p => ({ ...p, end_date: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Cuota inscripción</label>
-              <input type="number" className="input" value={formC.registration_fee} onChange={e => setFormC(p => ({ ...p, registration_fee: Number(e.target.value) }))} min="0" />
-            </div>
-            <div>
-              <label className="label">Máx. equipos</label>
-              <input type="number" className="input" value={formC.max_teams} onChange={e => setFormC(p => ({ ...p, max_teams: Number(e.target.value) }))} min="0" />
-            </div>
+      {/* Modal Campeonato */}
+      <Modal isOpen={showChampModal} onClose={() => { setShowChampModal(false); setChampForm({ ...INITIAL_CHAMP }) }} title="Nuevo Campeonato" size="lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="label">Nombre del campeonato *</label>
+            <input className="input-field" value={champForm.name} onChange={e => setChampForm(p => ({ ...p, name: e.target.value }))} placeholder="Copa Navidad 2025" />
           </div>
           <div>
-            <label className="label">Premio</label>
-            <input className="input" value={formC.prize} onChange={e => setFormC(p => ({ ...p, prize: e.target.value }))} placeholder="Descripción del premio" />
-          </div>
-          <div>
-            <label className="label">Estado</label>
-            <select className="input" value={formC.status} onChange={e => setFormC(p => ({ ...p, status: e.target.value }))}>
-              {['inscripcion','en_curso','finalizado','cancelado'].map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+            <label className="label">Deporte</label>
+            <select className="input-field" value={champForm.sport_type} onChange={e => setChampForm(p => ({ ...p, sport_type: e.target.value }))}>
+              <option value="fútbol">Fútbol</option>
+              <option value="microfútbol">Microfútbol</option>
+              <option value="baloncesto">Baloncesto</option>
+              <option value="voleibol">Voleibol</option>
+              <option value="otro">Otro</option>
             </select>
+          </div>
+          <div>
+            <label className="label">Categoría</label>
+            <input className="input-field" value={champForm.category} onChange={e => setChampForm(p => ({ ...p, category: e.target.value }))} placeholder="Sub-20, Libre, Femenino..." />
+          </div>
+          <div>
+            <label className="label">Fecha inicio</label>
+            <input type="date" className="input-field" value={champForm.start_date} onChange={e => setChampForm(p => ({ ...p, start_date: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Fecha fin</label>
+            <input type="date" className="input-field" value={champForm.end_date} onChange={e => setChampForm(p => ({ ...p, end_date: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Cuota de inscripción</label>
+            <input type="number" className="input-field" value={champForm.registration_fee} onChange={e => setChampForm(p => ({ ...p, registration_fee: Number(e.target.value) }))} />
+          </div>
+          <div>
+            <label className="label">Máximo de equipos</label>
+            <input type="number" className="input-field" value={champForm.max_teams} onChange={e => setChampForm(p => ({ ...p, max_teams: Number(e.target.value) }))} />
+          </div>
+          <div className="col-span-2">
+            <label className="label">Premio / Descripción</label>
+            <textarea className="input-field h-20 resize-none" value={champForm.prize_description} onChange={e => setChampForm(p => ({ ...p, prize_description: e.target.value }))} placeholder="Descripción del premio o torneos..." />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={() => setOpenC(false)} className="btn btn-secondary">Cancelar</button>
-          <button onClick={saveChamp} disabled={saving} className="btn btn-primary">
+          <button onClick={() => setShowChampModal(false)} className="btn-secondary">Cancelar</button>
+          <button onClick={saveChamp} disabled={saving} className="btn-primary">
             {saving ? 'Guardando...' : '✓ Crear Campeonato'}
           </button>
         </div>
       </Modal>
 
-      {/* Modal nuevo equipo */}
-      <Modal open={openT} onClose={() => { setOpenT(false); setFormT({...EMPTY_T}) }} title="Inscribir Equipo">
+      {/* Modal Equipo */}
+      <Modal isOpen={showTeamModal} onClose={() => { setShowTeamModal(false); setTeamForm({ ...INITIAL_TEAM }) }} title="Agregar Equipo" size="md">
         <div className="space-y-4">
           <div>
             <label className="label">Nombre del equipo *</label>
-            <input className="input" value={formT.name} onChange={e => setFormT(p => ({ ...p, name: e.target.value }))} placeholder="Nombre del equipo" />
+            <input className="input-field" value={teamForm.name} onChange={e => setTeamForm(p => ({ ...p, name: e.target.value }))} placeholder="Los Cracks FC" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Capitán</label>
-              <input className="input" value={formT.captain_name} onChange={e => setFormT(p => ({ ...p, captain_name: e.target.value }))} placeholder="Nombre del capitán" />
-            </div>
-            <div>
-              <label className="label">Teléfono</label>
-              <input className="input" value={formT.captain_phone} onChange={e => setFormT(p => ({ ...p, captain_phone: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Nro. jugadores</label>
-              <input type="number" className="input" value={formT.player_count} onChange={e => setFormT(p => ({ ...p, player_count: Number(e.target.value) }))} min="0" />
-            </div>
-            <div>
-              <label className="label">Monto pagado</label>
-              <input type="number" className="input" value={formT.amount_paid} onChange={e => setFormT(p => ({ ...p, amount_paid: Number(e.target.value) }))} min="0" />
-            </div>
+          <div>
+            <label className="label">Capitán</label>
+            <input className="input-field" value={teamForm.captain_name} onChange={e => setTeamForm(p => ({ ...p, captain_name: e.target.value }))} placeholder="Nombre del capitán" />
+          </div>
+          <div>
+            <label className="label">Teléfono capitán</label>
+            <input className="input-field" value={teamForm.captain_phone} onChange={e => setTeamForm(p => ({ ...p, captain_phone: e.target.value }))} placeholder="3001234567" />
+          </div>
+          <div>
+            <label className="label">Número de jugadores</label>
+            <input type="number" className="input-field" value={teamForm.player_count} onChange={e => setTeamForm(p => ({ ...p, player_count: Number(e.target.value) }))} />
           </div>
           <div className="flex items-center gap-3">
-            <input type="checkbox" id="paid" checked={formT.registration_paid}
-              onChange={e => setFormT(p => ({ ...p, registration_paid: e.target.checked }))}
-              className="w-4 h-4 accent-orange-500" />
-            <label htmlFor="paid" className="text-white/60 text-sm cursor-pointer">Inscripción pagada</label>
+            <input type="checkbox" id="paid" checked={teamForm.registration_paid} onChange={e => setTeamForm(p => ({ ...p, registration_paid: e.target.checked }))} className="w-4 h-4" />
+            <label htmlFor="paid" className="text-white/70 text-sm cursor-pointer">
+              Inscripción pagada {selected && `(${formatCurrency(selected.registration_fee)})`}
+            </label>
           </div>
+          {teamForm.registration_paid && (
+            <div>
+              <label className="label">Monto pagado</label>
+              <input type="number" className="input-field" value={teamForm.amount_paid || selected?.registration_fee || 0}
+                onChange={e => setTeamForm(p => ({ ...p, amount_paid: Number(e.target.value) }))} />
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={() => setOpenT(false)} className="btn btn-secondary">Cancelar</button>
-          <button onClick={saveTeam} disabled={saving} className="btn btn-primary">
-            {saving ? 'Guardando...' : '✓ Inscribir Equipo'}
+          <button onClick={() => setShowTeamModal(false)} className="btn-secondary">Cancelar</button>
+          <button onClick={saveTeam} disabled={saving} className="btn-primary">
+            {saving ? 'Guardando...' : '✓ Agregar Equipo'}
           </button>
         </div>
       </Modal>
