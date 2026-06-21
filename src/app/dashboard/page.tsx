@@ -70,7 +70,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="section-title text-white">Dashboard</h1>
-            <p className="text-white/40 text-sm mt-1">Cancha Sintética Invictos · Resumen del mes</p>
+            <p className="text-white/40 text-sm mt-1">Cancha Sintetica Invictos · Resumen del mes</p>
           </div>
           <button onClick={fetchDashboard} className="btn-secondary text-xs">↻ Actualizar</button>
         </div>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
                   <tr className="text-white/30 text-xs uppercase tracking-wider">
                     <th className="text-left pb-3 px-4 md:px-0">Tipo</th>
                     <th className="text-left pb-3 px-2">Cliente</th>
-                    <th className="text-left pb-3 px-2">Método</th>
+                    <th className="text-left pb-3 px-2">Metodo</th>
                     <th className="text-right pb-3 px-4 md:px-0">Total</th>
                   </tr>
                 </thead>
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                   ) : recentSales.map(sale => (
                     <tr key={sale.id} className="table-row">
                       <td className="py-2.5 px-4 md:px-0">{TYPE_LABELS[sale.sale_type] || sale.sale_type}</td>
-                      <td className="py-2.5 px-2 text-white/60">{sale.customer_name || '—'}</td>
+                      <td className="py-2.5 px-2 text-white/60">{sale.customer_name || '--'}</td>
                       <td className="py-2.5 px-2 text-white/40 capitalize">{sale.payment_method}</td>
                       <td className="py-2.5 px-4 md:px-0 text-right font-medium text-orange-400">{formatCurrency(Number(sale.total_amount))}</td>
                     </tr>

@@ -108,8 +108,8 @@ export default function ReportesPage() {
 
   function exportCSV() {
     const rows = [
-      ['Reporte Cancha Sintética Invictos'],
-      ['Período', period],
+      ['Reporte Cancha Sintetica Invictos'],
+      ['Periodo', period],
       [''],
       ['RESUMEN'],
       ['Ingresos totales', data.totalRevenue],
@@ -140,11 +140,11 @@ export default function ReportesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="section-title text-white">Reportes</h1>
-            <p className="text-white/40 text-sm mt-1">Análisis de rendimiento del negocio</p>
+            <p className="text-white/40 text-sm mt-1">Analisis de rendimiento del negocio</p>
           </div>
           <div className="flex gap-3">
             <div className="flex rounded-xl overflow-hidden border border-white/10">
-              {[['7d','7 días'],['30d','30 días'],['90d','90 días'],['year','Este año']].map(([v, l]) => (
+              {[['7d','7 dias'],['30d','30 dias'],['90d','90 dias'],['year','Este ano']].map(([v, l]) => (
                 <button key={v} onClick={() => setPeriod(v)}
                   className={`px-3 py-2 text-xs transition-all ${period === v ? 'bg-orange-500 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                   {l}
@@ -177,7 +177,7 @@ export default function ReportesPage() {
               ))}
             </div>
 
-            {/* Módulos */}
+            {/* Modulos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="card">
                 <h3 className="text-white/60 text-xs uppercase tracking-wider mb-1">🏟 Alquiler de Cancha</h3>
@@ -203,7 +203,7 @@ export default function ReportesPage() {
               </div>
             </div>
 
-            {/* Gráficas */}
+            {/* Graficas */}
             <div className="card">
               <h3 className="text-white/70 text-sm font-medium mb-4">Ingresos diarios</h3>
               <ResponsiveContainer width="100%" height={220}>
@@ -225,7 +225,7 @@ export default function ReportesPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Pie por tipo */}
               <div className="card">
-                <h3 className="text-white/70 text-sm font-medium mb-4">Distribución por tipo</h3>
+                <h3 className="text-white/70 text-sm font-medium mb-4">Distribucion por tipo</h3>
                 {data.revenueByType.length > 0 ? (
                   <>
                     <ResponsiveContainer width="100%" height={180}>
@@ -252,7 +252,7 @@ export default function ReportesPage() {
 
               {/* Top productos */}
               <div className="card">
-                <h3 className="text-white/70 text-sm font-medium mb-4">Productos más vendidos</h3>
+                <h3 className="text-white/70 text-sm font-medium mb-4">Productos mas vendidos</h3>
                 {data.topProducts.length === 0 ? (
                   <div className="flex items-center justify-center h-48 text-white/20 text-sm">Sin ventas de productos</div>
                 ) : (
@@ -289,7 +289,7 @@ export default function ReportesPage() {
                     <div key={p.id} className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
                       <div className="text-white/80 text-sm font-medium">{p.name}</div>
                       <div className="text-orange-400 text-lg font-bold mt-1" style={{ fontFamily: 'Oswald, sans-serif' }}>{p.stock} <span className="text-xs font-normal text-white/30">{p.unit}</span></div>
-                      <div className="text-white/30 text-xs">Mínimo: {p.min_stock}</div>
+                      <div className="text-white/30 text-xs">Minimo: {p.min_stock}</div>
                     </div>
                   ))}
                 </div>
