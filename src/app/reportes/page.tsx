@@ -298,8 +298,6 @@ export default function ReportesPage() {
           </>
         )}
       </div>
-      </div>
-      </div>
     </AppLayout>
   )
 }
