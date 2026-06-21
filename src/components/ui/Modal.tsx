@@ -65,7 +65,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
           </button>
         </div>
 
-        {/* Content -- scrolleable */}
+        {/* Content — scrolleable */}
         <div className="p-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
