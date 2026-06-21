@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('app_config')
-        .select('value')
+        .select('key, value')
         .in('key', ['pin_admin', 'pin_cajero'])
 
       if (error) throw error
