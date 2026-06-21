@@ -7,7 +7,7 @@ import { formatCurrency, formatDate, STATUS_COLORS, getStatusLabel } from '@/lib
 import { useAuth } from '@/lib/auth'
 
 const INITIAL_CHAMP = {
-  name: '', sport_type: 'fútbol', category: '', start_date: '', end_date: '',
+  name: '', sport_type: 'futbol', category: '', start_date: '', end_date: '',
   registration_fee: 0, prize_description: '', max_teams: 0, status: 'inscripcion', description: '',
 }
 
@@ -87,7 +87,7 @@ export default function CampeonatosPage() {
         customer_name: teamForm.captain_name || teamForm.name,
         total_amount: Number(teamForm.amount_paid) || selected.registration_fee,
         payment_method: 'efectivo',
-        notes: `Inscripción ${selected.name} - Equipo ${teamForm.name}`,
+        notes: `Inscripcion ${selected.name} - Equipo ${teamForm.name}`,
       }])
     }
     setSaving(false)
@@ -164,14 +164,14 @@ export default function CampeonatosPage() {
                         disabled={deleting === c.id}
                         className="text-red-400/40 hover:text-red-400 transition-colors text-xs p-1 rounded hover:bg-red-500/10"
                       >
-                        {deleting === c.id ? '…' : '🗑'}
+                        {deleting === c.id ? '...' : '🗑'}
                       </button>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-xs text-white/40">
-                  {c.registration_fee > 0 && <span>Inscripción: {formatCurrency(c.registration_fee)}</span>}
-                  {c.max_teams ? <span>Máx {c.max_teams} equipos</span> : null}
+                  {c.registration_fee > 0 && <span>Inscripcion: {formatCurrency(c.registration_fee)}</span>}
+                  {c.max_teams ? <span>Max {c.max_teams} equipos</span> : null}
                 </div>
               </div>
             ))}
@@ -243,9 +243,9 @@ export default function CampeonatosPage() {
                       <thead style={{ background: 'rgba(255,255,255,0.03)' }}>
                         <tr className="text-white/30 text-xs uppercase tracking-wider">
                           <th className="text-left px-4 py-3">Equipo</th>
-                          <th className="text-left px-4 py-3">Capitán</th>
+                          <th className="text-left px-4 py-3">Capitan</th>
                           <th className="text-center px-4 py-3">Jugadores</th>
-                          <th className="text-center px-4 py-3">Inscripción</th>
+                          <th className="text-center px-4 py-3">Inscripcion</th>
                           {isAdmin && <th className="px-4 py-3" />}
                         </tr>
                       </thead>
@@ -260,7 +260,7 @@ export default function CampeonatosPage() {
                           <tr key={t.id} className="table-row">
                             <td className="px-4 py-3 text-white font-medium">{t.name}</td>
                             <td className="px-4 py-3 text-white/60">
-                              <div>{t.captain_name || '—'}</div>
+                              <div>{t.captain_name || '--'}</div>
                               {t.captain_phone && (
                                 <div className="text-white/30 text-xs">{t.captain_phone}</div>
                               )}
@@ -314,15 +314,15 @@ export default function CampeonatosPage() {
             <label className="label">Deporte</label>
             <select className="input-field" value={champForm.sport_type}
               onChange={e => setChampForm(p => ({ ...p, sport_type: e.target.value }))}>
-              <option value="fútbol">Fútbol</option>
-              <option value="microfútbol">Microfútbol</option>
+              <option value="futbol">Futbol</option>
+              <option value="microfutbol">Microfutbol</option>
               <option value="baloncesto">Baloncesto</option>
               <option value="voleibol">Voleibol</option>
               <option value="otro">Otro</option>
             </select>
           </div>
           <div>
-            <label className="label">Categoría</label>
+            <label className="label">Categoria</label>
             <input className="input-field" value={champForm.category}
               onChange={e => setChampForm(p => ({ ...p, category: e.target.value }))}
               placeholder="Sub-20, Libre, Femenino..." />
@@ -338,20 +338,20 @@ export default function CampeonatosPage() {
               onChange={e => setChampForm(p => ({ ...p, end_date: e.target.value }))} />
           </div>
           <div>
-            <label className="label">Cuota de inscripción</label>
+            <label className="label">Cuota de inscripcion</label>
             <input type="number" className="input-field" value={champForm.registration_fee}
               onChange={e => setChampForm(p => ({ ...p, registration_fee: Number(e.target.value) }))} />
           </div>
           <div>
-            <label className="label">Máximo de equipos</label>
+            <label className="label">Maximo de equipos</label>
             <input type="number" className="input-field" value={champForm.max_teams}
               onChange={e => setChampForm(p => ({ ...p, max_teams: Number(e.target.value) }))} />
           </div>
           <div className="md:col-span-2">
-            <label className="label">Premio / Descripción</label>
+            <label className="label">Premio / Descripcion</label>
             <textarea className="input-field h-20 resize-none" value={champForm.prize_description}
               onChange={e => setChampForm(p => ({ ...p, prize_description: e.target.value }))}
-              placeholder="Descripción del premio o torneo..." />
+              placeholder="Descripcion del premio o torneo..." />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
@@ -377,19 +377,19 @@ export default function CampeonatosPage() {
               placeholder="Los Cracks FC" />
           </div>
           <div>
-            <label className="label">Capitán</label>
+            <label className="label">Capitan</label>
             <input className="input-field" value={teamForm.captain_name}
               onChange={e => setTeamForm(p => ({ ...p, captain_name: e.target.value }))}
-              placeholder="Nombre del capitán" />
+              placeholder="Nombre del capitan" />
           </div>
           <div>
-            <label className="label">Teléfono capitán</label>
+            <label className="label">Telefono capitan</label>
             <input className="input-field" value={teamForm.captain_phone}
               onChange={e => setTeamForm(p => ({ ...p, captain_phone: e.target.value }))}
               placeholder="0991234567" />
           </div>
           <div>
-            <label className="label">Número de jugadores</label>
+            <label className="label">Numero de jugadores</label>
             <input type="number" className="input-field" value={teamForm.player_count}
               onChange={e => setTeamForm(p => ({ ...p, player_count: Number(e.target.value) }))} />
           </div>
@@ -398,7 +398,7 @@ export default function CampeonatosPage() {
               onChange={e => setTeamForm(p => ({ ...p, registration_paid: e.target.checked }))}
               className="w-4 h-4" />
             <label htmlFor="paid" className="text-white/70 text-sm cursor-pointer">
-              Inscripción pagada {selected ? `(${formatCurrency(selected.registration_fee)})` : ''}
+              Inscripcion pagada {selected ? `(${formatCurrency(selected.registration_fee)})` : ''}
             </label>
           </div>
           {teamForm.registration_paid && (

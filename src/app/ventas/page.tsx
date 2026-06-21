@@ -99,7 +99,7 @@ export default function VentasPage() {
   }
 
   async function deleteSale(id: string) {
-    if (!confirm('¿Eliminar esta venta? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Eliminar esta venta? Esta accion no se puede deshacer.')) return
     setDeleting(id)
     await supabase.from('sale_items').delete().eq('sale_id', id)
     await supabase.from('sales').delete().eq('id', id)
@@ -123,7 +123,7 @@ export default function VentasPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="section-title text-white">Ventas / Caja</h1>
-            <p className="text-white/40 text-sm mt-1">{filtered.length} transacciones — Total: {formatCurrency(totalFiltered)}</p>
+            <p className="text-white/40 text-sm mt-1">{filtered.length} transacciones -- Total: {formatCurrency(totalFiltered)}</p>
           </div>
           <button onClick={() => setShowModal(true)} className="btn-primary">+ Registrar Venta</button>
         </div>
@@ -141,7 +141,7 @@ export default function VentasPage() {
           )}
         </div>
 
-        {/* Resumen rápido */}
+        {/* Resumen rapido */}
         <div className="grid grid-cols-2 sm:grid-cols-2 sm:grid-cols-4 gap-3">
           {['alquiler', 'campeonato', 'producto', 'bebida'].map(type => {
             const typeSales = filtered.filter(s => s.sale_type === type)
@@ -165,7 +165,7 @@ export default function VentasPage() {
                 <th className="text-left px-4 py-3">Fecha</th>
                 <th className="text-left px-4 py-3">Tipo</th>
                 <th className="text-left px-4 py-3">Cliente</th>
-                <th className="text-left px-4 py-3">Método</th>
+                <th className="text-left px-4 py-3">Metodo</th>
                 <th className="text-left px-4 py-3">Notas</th>
                 <th className="text-right px-4 py-3">Total</th>
                 {isAdmin && <th className="px-4 py-3" />}
@@ -175,14 +175,14 @@ export default function VentasPage() {
               {loading ? (
                 <tr><td colSpan={isAdmin ? 7 : 6} className="text-center text-white/20 py-12">Cargando...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={isAdmin ? 7 : 6} className="text-center text-white/20 py-12">Sin ventas en el período seleccionado</td></tr>
+                <tr><td colSpan={isAdmin ? 7 : 6} className="text-center text-white/20 py-12">Sin ventas en el periodo seleccionado</td></tr>
               ) : filtered.map(sale => (
                 <tr key={sale.id} className="table-row">
                   <td className="px-4 py-3 text-white/50 text-xs">{formatDateTime(sale.created_at)}</td>
                   <td className="px-4 py-3">{TYPE_LABELS[sale.sale_type]}</td>
-                  <td className="px-4 py-3 text-white/60">{sale.customer_name || '—'}</td>
+                  <td className="px-4 py-3 text-white/60">{sale.customer_name || '--'}</td>
                   <td className="px-4 py-3 text-white/50">{PAYMENT_ICONS[sale.payment_method]} {sale.payment_method}</td>
-                  <td className="px-4 py-3 text-white/30 text-xs truncate max-w-32">{sale.notes || '—'}</td>
+                  <td className="px-4 py-3 text-white/30 text-xs truncate max-w-32">{sale.notes || '--'}</td>
                   <td className="px-4 py-3 text-right font-bold text-orange-400">{formatCurrency(Number(sale.total_amount))}</td>
                   {isAdmin && (
                     <td className="px-4 py-3 text-center">
@@ -201,7 +201,7 @@ export default function VentasPage() {
             {filtered.length > 0 && (
               <tfoot style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <tr>
-                  <td colSpan={isAdmin ? 6 : 5} className="px-4 py-3 text-white/50 text-sm font-medium">Total período</td>
+                  <td colSpan={isAdmin ? 6 : 5} className="px-4 py-3 text-white/50 text-sm font-medium">Total periodo</td>
                   <td className="px-4 py-3 text-right font-bold text-orange-400 text-lg">{formatCurrency(totalFiltered)}</td>
                 </tr>
               </tfoot>
@@ -232,7 +232,7 @@ export default function VentasPage() {
               <select className="input-field mb-3" onChange={e => { if (e.target.value) { addItem(e.target.value); e.target.value = '' } }}>
                 <option value="">Seleccionar producto...</option>
                 {products.filter(p => form.sale_type === 'bebida' ? p.is_beverage : !p.is_beverage).map(p => (
-                  <option key={p.id} value={p.id}>{p.name} — {formatCurrency(p.price)} (stock: {p.stock})</option>
+                  <option key={p.id} value={p.id}>{p.name} -- {formatCurrency(p.price)} (stock: {p.stock})</option>
                 ))}
               </select>
               {saleItems.length > 0 && (
@@ -264,7 +264,7 @@ export default function VentasPage() {
           )}
 
           <div>
-            <label className="label">Método de pago</label>
+            <label className="label">Metodo de pago</label>
             <div className="flex gap-2">
               {['efectivo', 'tarjeta', 'transferencia', 'otro'].map(m => (
                 <button key={m} onClick={() => setForm(p => ({ ...p, payment_method: m }))}

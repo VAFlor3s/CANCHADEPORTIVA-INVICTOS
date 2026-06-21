@@ -107,7 +107,7 @@ export default function ReservasPage() {
   }
 
   async function deleteReservation(id: string) {
-    if (!confirm('¿Eliminar esta reserva? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Eliminar esta reserva? Esta accion no se puede deshacer.')) return
     setDeleting(id)
     await supabase.from('reservations').delete().eq('id', id)
     setDeleting(null)
@@ -175,7 +175,7 @@ export default function ReservasPage() {
                 <tr key={r.id} className="table-row">
                   <td className="px-4 py-3 text-white/80">{formatDate(r.date)}</td>
                   <td className="px-4 py-3 text-white/60">{formatTime(r.start_time)} - {formatTime(r.end_time)}</td>
-                  <td className="px-4 py-3 text-white/60">{(r as any).fields?.name || '—'}</td>
+                  <td className="px-4 py-3 text-white/60">{(r as any).fields?.name || '--'}</td>
                   <td className="px-4 py-3">
                     <div className="text-white/80">{r.customer_name}</div>
                     {r.customer_phone && <div className="text-white/30 text-xs">{r.customer_phone}</div>}
@@ -211,7 +211,7 @@ export default function ReservasPage() {
             <label className="label">Cancha *</label>
             <select className="input-field" value={form.field_id} onChange={handleFieldChange}>
               <option value="">Seleccionar cancha...</option>
-              {fields.map(f => <option key={f.id} value={f.id}>{f.name} — {formatCurrency(f.price_per_hour)}/hr</option>)}
+              {fields.map(f => <option key={f.id} value={f.id}>{f.name} -- {formatCurrency(f.price_per_hour)}/hr</option>)}
             </select>
           </div>
           <div>
@@ -219,7 +219,7 @@ export default function ReservasPage() {
             <input className="input-field" value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Nombre del cliente" />
           </div>
           <div>
-            <label className="label">Teléfono</label>
+            <label className="label">Telefono</label>
             <input className="input-field" value={form.customer_phone} onChange={e => setForm(p => ({ ...p, customer_phone: e.target.value }))} placeholder="3001234567" />
           </div>
           <div>

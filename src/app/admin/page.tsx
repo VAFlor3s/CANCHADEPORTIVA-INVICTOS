@@ -31,10 +31,10 @@ export default function AdminPage() {
 
   async function savePins() {
     if (newPinAdmin && (newPinAdmin.length < 4 || newPinAdmin.length > 6 || !/^\d+$/.test(newPinAdmin))) {
-      setMsg('El PIN debe ser numérico y tener 4-6 dígitos'); return
+      setMsg('El PIN debe ser numerico y tener 4-6 digitos'); return
     }
     if (newPinCajero && (newPinCajero.length < 4 || newPinCajero.length > 6 || !/^\d+$/.test(newPinCajero))) {
-      setMsg('El PIN debe ser numérico y tener 4-6 dígitos'); return
+      setMsg('El PIN debe ser numerico y tener 4-6 digitos'); return
     }
 
     setSaving(true)
@@ -63,7 +63,7 @@ export default function AdminPage() {
     <AppLayout>
       <div className="space-y-6 animate-in max-w-xl">
         <div>
-          <h1 className="section-title text-white">Configuración</h1>
+          <h1 className="section-title text-white">Configuracion</h1>
           <p className="text-white/40 text-sm mt-1">Solo visible para el Administrador</p>
         </div>
 
@@ -84,7 +84,7 @@ export default function AdminPage() {
                   <div className="w-2.5 h-2.5 rounded-full bg-orange-400" />
                 </div>
                 <div>
-                  <label className="label">Nuevo PIN (4-6 dígitos)</label>
+                  <label className="label">Nuevo PIN (4-6 digitos)</label>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -92,7 +92,7 @@ export default function AdminPage() {
                     className="input-field"
                     value={newPinAdmin}
                     onChange={e => setNewPinAdmin(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Dejar vacío para no cambiar"
+                    placeholder="Dejar vacio para no cambiar"
                   />
                 </div>
               </div>
@@ -107,7 +107,7 @@ export default function AdminPage() {
                   <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
                 </div>
                 <div>
-                  <label className="label">Nuevo PIN (4-6 dígitos)</label>
+                  <label className="label">Nuevo PIN (4-6 digitos)</label>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -115,7 +115,7 @@ export default function AdminPage() {
                     className="input-field"
                     value={newPinCajero}
                     onChange={e => setNewPinCajero(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Dejar vacío para no cambiar"
+                    placeholder="Dejar vacio para no cambiar"
                   />
                 </div>
               </div>
@@ -145,7 +145,7 @@ export default function AdminPage() {
               ['🧃 Bebidas', '✓ Admin (+ modificar stock)', '✗ Cajero'],
               ['💰 Ventas / Caja', '✓ Admin (+ borrar)', '✓ Cajero (solo ver + vender)'],
               ['📊 Reportes', '✓ Admin', '✗ Cajero'],
-              ['⚙️ Configuración', '✓ Admin', '✗ Cajero'],
+              ['⚙️ Configuracion', '✓ Admin', '✗ Cajero'],
             ].map(([page, admin, cajero]) => (
               <div key={page as string} className="grid grid-cols-3 gap-2 py-1.5 border-b border-white/5">
                 <span className="text-white/70">{page}</span>

@@ -5,7 +5,7 @@ import { AuthProvider } from '@/lib/auth'
 
 export const metadata: Metadata = {
   title: 'Cancha Sintética Invictos',
-  description: 'Sistema de gestión — Cancha Sintética Invictos',
+  description: 'Sistema de gestión -- Cancha Sintética Invictos',
 }
 
 export const viewport: Viewport = {

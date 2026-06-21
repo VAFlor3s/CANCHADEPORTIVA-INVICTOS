@@ -74,7 +74,7 @@ export default function InventarioPage() {
     const priceVal = parseFloat(String(form.price).replace(',', '.'))
     const costVal = parseFloat(String(form.cost).replace(',', '.')) || 0
     if (!form.name) { alert('El nombre es obligatorio'); return }
-    if (isNaN(priceVal) || priceVal < 0) { alert('Ingresa un precio válido'); return }
+    if (isNaN(priceVal) || priceVal < 0) { alert('Ingresa un precio valido'); return }
     setSaving(true)
     const payload = {
       name: form.name,
@@ -245,16 +245,16 @@ export default function InventarioPage() {
               placeholder={`Nombre del ${isBeverage ? 'bebida' : 'producto'}`} />
           </div>
           <div className="md:col-span-2">
-            <label className="label">Descripción</label>
+            <label className="label">Descripcion</label>
             <textarea className="input-field h-14 resize-none" value={form.description}
               onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-              placeholder="Descripción opcional..." />
+              placeholder="Descripcion opcional..." />
           </div>
           <div>
-            <label className="label">Categoría</label>
+            <label className="label">Categoria</label>
             <select className="input-field" value={form.category_id}
               onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}>
-              <option value="">Sin categoría</option>
+              <option value="">Sin categoria</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -291,7 +291,7 @@ export default function InventarioPage() {
               onChange={e => setForm(p => ({ ...p, stock: Number(e.target.value) }))} />
           </div>
           <div>
-            <label className="label">Stock mínimo</label>
+            <label className="label">Stock minimo</label>
             <input type="number" className="input-field" value={form.min_stock}
               onChange={e => setForm(p => ({ ...p, min_stock: Number(e.target.value) }))} />
           </div>
@@ -347,7 +347,7 @@ export default function InventarioPage() {
             <label className="label">Motivo</label>
             <input className="input-field" value={stockForm.reason}
               onChange={e => setStockForm(p => ({ ...p, reason: e.target.value }))}
-              placeholder="Compra, pérdida, inventario..." />
+              placeholder="Compra, perdida, inventario..." />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-5">
